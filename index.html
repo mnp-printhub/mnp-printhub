@@ -315,5 +315,50 @@ function makeVoterManualPdf(){if(!window.jspdf||!window.jspdf.jsPDF)return toast
 document.addEventListener('DOMContentLoaded',renderCscServices);
 document.addEventListener('DOMContentLoaded',()=>{if($('billDate'))$('billDate').value=new Date().toISOString().slice(0,10);renderCustomerRecords();calculateBill();buildWhatsAppMessage()});
 </script>
+ 
+<!-- MNP-PrintHub Developer Login Button -->
+<div style="text-align:center; margin:24px 0;">
+  <button
+    type="button"
+    onclick="document.getElementById('developerLoginBox').style.display='block'"
+    style="background:#123b72;color:white;padding:12px 22px;border:0;border-radius:10px;font-weight:bold;cursor:pointer;">
+    Developer Login
+  </button>
+</div>
+
+<!-- Developer Login Popup -->
+<div id="developerLoginBox" style="display:none;max-width:360px;margin:20px auto;padding:20px;border:1px solid #ddd;border-radius:14px;background:#fff;color:#222;font-family:Arial,sans-serif;">
+  <h2 style="margin-top:0;">MNP-PrintHub</h2>
+  <p>Developer Login — SMS OTP</p>
+
+  <label for="developerPhone">Mobile Number</label>
+  <input id="developerPhone" type="tel" placeholder="Enter mobile number"
+    style="display:block;width:100%;box-sizing:border-box;padding:12px;margin:8px 0 14px;border:1px solid #ccc;border-radius:8px;">
+
+  <div id="recaptcha-container"></div>
+
+  <button type="button" id="sendDeveloperOtp"
+    style="width:100%;padding:12px;background:#167348;color:white;border:0;border-radius:8px;cursor:pointer;">
+    Send OTP
+  </button>
+
+  <div id="developerOtpArea" style="display:none;margin-top:14px;">
+    <label for="developerOtp">SMS में आया OTP डालें</label>
+    <input id="developerOtp" type="text" inputmode="numeric" placeholder="Enter OTP"
+      style="display:block;width:100%;box-sizing:border-box;padding:12px;margin:8px 0;border:1px solid #ccc;border-radius:8px;">
+    <button type="button" id="verifyDeveloperOtp"
+      style="width:100%;padding:12px;background:#123b72;color:white;border:0;border-radius:8px;">
+      Verify OTP
+    </button>
+  </div>
+
+  <p id="developerLoginMessage" role="status" style="font-size:14px;"></p>
+  <button type="button"
+    onclick="document.getElementById('developerLoginBox').style.display='none'"
+    style="background:#eee;border:0;border-radius:8px;padding:9px 14px;cursor:pointer;">
+    Close
+  </button>
+</div>
+
 </body>
 </html>
