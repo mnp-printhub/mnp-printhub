@@ -201,7 +201,10 @@
 <form id="authForm" class="space-y-3" onsubmit="submitAuth(event)"><div id="authNameWrap"><label class="label">Full name</label><input id="authName" class="input" autocomplete="name" placeholder="Your name"></div><div><label class="label">Mobile number</label><input id="authMobile" class="input" inputmode="numeric" maxlength="10" autocomplete="tel" placeholder="10-digit mobile number" required></div><div><label class="label">Password</label><input id="authPassword" class="input" type="password" minlength="6" autocomplete="current-password" placeholder="At least 6 characters" required></div><p id="authMessage" class="text-xs text-slate-600">Register, then request ₹99 monthly access.</p><button id="authSubmit" class="btn btn-primary w-full" type="submit">Create account & continue</button></form><p class="text-xs text-amber-700 bg-amber-50 rounded-xl p-3 mt-4">Demo mode: account data is local to this browser only. This is not secure production authentication or server-side access control. A real deployment needs backend login; do not reuse an important password.</p></div></div>
 <div id="toast" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 hidden bg-slate-800 text-white text-sm px-4 py-3 rounded-xl shadow-xl max-w-[90vw]"></div>
 <script src="https://docs.opencv.org/4.x/opencv.js" async></script>
-<script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+ <script>
 let originalImage=null, rotated=0, finalCanvas=null, qrInstance=null;
 const $=id=>document.getElementById(id);
 window.mnpDemoLoggedIn=false;setInterval(()=>{if(!window.mnpDemoLoggedIn && $('authModal') && $('authModal').classList.contains('hidden'))showAuth('login')},5000);
