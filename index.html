@@ -213,7 +213,30 @@ function applyPrintPreset(type){const info={A4:'A4: 210 × 297 mm · 300 DPI प
 window.addEventListener('load',()=>{if(!window.mnpDemoLoggedIn)showAuth('login')});
 function setBgColor(hex){$('bgColor').value=hex;renderBgPreview()}
 let authMode='register';
-function showAuth(mode){authMode=mode;$('authModal').classList.remove('hidden');$('authModal').classList.add('flex');$('authTitle').textContent=mode==='register'?'Create account':'Welcome back';$('authNameWrap').classList.toggle('hidden',mode==='login');$('authPassword').autocomplete=mode==='login'?'current-password':'new-password';$('authSubmit').textContent=mode==='register'?'Create account & continue':'Login';$('registerTab').className='btn '+(mode==='register'?'btn-primary':'btn-soft')+' flex-1';$('loginTab').className='btn '+(mode==='login'?'btn-primary':'btn-soft')+' flex-1';$('authMessage').textContent=mode==='register'?'Register, then request ₹99 monthly access.':'Login on this browser using the demo account you registered here.'}
+
+function showAuth(mode){
+  authMode=mode;
+  $('authModal').classList.remove('hidden');
+  $('authModal').classList.add('flex');
+  $('authTitle').textContent =
+    mode==='register' ? 'Create account' :
+    mode==='developer' ? 'Developer Login' : 'Welcome back';
+  $('authNameWrap').classList.toggle('hidden',mode==='login'||mode==='developer');
+  $('authPassword').autocomplete =
+    mode==='login' ? 'current-password' : 'new-password';
+  $('authSubmit').textContent =
+    mode==='register' ? 'Create account & continue' :
+    mode==='developer' ? 'Developer Login' : 'Login';
+  $('registerTab').className='btn '+(mode==='register'?'btn-primary':'btn-soft')+' flex-1';
+  $('loginTab').className='btn '+(mode==='login'?'btn-primary':'btn-soft')+' flex-1';
+  if($('developerTab')){
+    $('developerTab').className='btn '+(mode==='developer'?'btn-primary':'btn-soft')+' flex-1';
+  }
+  $('authMessage').textContent =
+    mode==='register' ? 'Register, then request ₹99 monthly access.' :
+    mode==='developer' ? 'Developer access requires separate secure verification.' :
+    'Login on this browser using the demo account you registered here.';
+}
 function hideAuth(){if(!window.mnpDemoLoggedIn){toast('Website use करने के लिए login/register करें।');return}$('authModal').classList.add('hidden');$('authModal').classList.remove('flex')}
 async function submitAuth(e){e.preventDefault();const mobile=$('authMobile').value.replace(/\D/g,'');const password=$('authPassword').value;const name=$('authName').value.trim();if(!/^[6-9]\d{9}$/.test(mobile))return toast('Valid 10-digit Indian mobile number भरें।');let users={};try{users=JSON.parse(localStorage.getItem('mnp_demo_users')||'{}')}catch(_){}const digest=async str=>{const data=new TextEncoder().encode(str);const hash=await crypto.subtle.digest('SHA-256',data);return [...new Uint8Array(hash)].map(b=>b.toString(16).padStart(2,'0')).join('')};if(authMode==='register'){if(!name)return toast('अपना नाम भरें।');if(users[mobile])return toast('इस मोबाइल से demo account पहले से है। Login करें।');users[mobile]={name,passwordHash:await digest(password),status:'pending'};localStorage.setItem('mnp_demo_users',JSON.stringify(users));window.mnpDemoLoggedIn=true;$('subName').value=name;$('subMobile').value=mobile;hideAuth();openTool('subscription-tool');toast('Demo registration हो गई। ₹99 payment request भेजें।')}else{if(!users[mobile]||users[mobile].passwordHash!==await digest(password))return toast('इस browser में account नहीं मिला या password गलत है।');window.mnpDemoLoggedIn=true;hideAuth();toast('Demo login सफल: '+users[mobile].name);openTool('subscription-tool')}}
 function filterTools(){const q=$('toolSearch').value.trim().toLowerCase();let count=0;document.querySelectorAll('.tool-card').forEach(c=>{const show=(c.dataset.search+' '+c.innerText).toLowerCase().includes(q);c.style.display=show?'':'none';if(show)count++});$('toolCount').textContent=count+' tools'}
