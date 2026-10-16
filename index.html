@@ -237,11 +237,41 @@ function resetRecaptcha(){
   mnpRecaptchaVerifier=null;
   const box=$('recaptcha-container');if(box)box.innerHTML='';
 }
-function ensureRecaptcha(){
-  if(mnpRecaptchaVerifier)return Promise.resolve(mnpRecaptchaVerifier);
-  if(!window.firebase||!firebase.auth)return Promise.reject(new Error('Firebase Auth load नहीं हुआ।'));
-  mnpRecaptchaVerifier=new firebase.auth.RecaptchaVerifier('recaptcha-container',{size:'normal',callback:()=>{},'expired-callback':()=>{mnpRecaptchaVerifier=null;toast('reCAPTCHA expire हो गया। दोबारा Send OTP करें।')}});
-  return mnpRecaptchaVerifier.render().then(()=>mnpRecaptchaVerifier);
+async function ensureRecaptcha(){
+  if(!window.firebase||!firebase.auth)throw new Error('Firebase Auth SDK load नहीं हुआ। पेज refresh करके दोबारा कोशिश करें।');
+  if(mnpRecaptchaVerifier)return mnpRecaptchaVerifier;
+  const box=$('recaptcha-container');
+  if(!box)throw new Error('reCAPTCHA container नहीं मिला।');
+  try{
+    mnpRecaptchaVerifier=new firebase.auth.RecaptchaVerifier('recaptcha-container',{
+      size:'normal',
+      callback:()=>{},
+      'expired-callback':()=>{resetRecaptcha();toast('reCAPTCHA expire हो गया। नया CAPTCHA पूरा करके OTP दोबारा भेजें।')}
+    });
+    await mnpRecaptchaVerifier.render();
+    return mnpRecaptchaVerifier;
+  }catch(err){
+    resetRecaptcha();
+    throw err;
+  }
+}
+function phoneOtpErrorMessage(err){
+  const code=(err&&err.code)||'';
+  const messages={
+    'auth/invalid-phone-number':'मोबाइल नंबर स्वीकार नहीं हुआ। +91 के साथ 10 अंकों का सही नंबर डालें।',
+    'auth/missing-phone-number':'पहले मोबाइल नंबर भरें।',
+    'auth/too-many-requests':'बहुत बार कोशिश हुई है। कुछ समय बाद दोबारा प्रयास करें।',
+    'auth/quota-exceeded':'Firebase SMS quota पूरी हो गई है। Firebase Console में SMS quota/billing जाँचें।',
+    'auth/billing-not-enabled':'Firebase project की billing/SMS service उपलब्ध नहीं है। Firebase Console में billing status जाँचें।',
+    'auth/captcha-check-failed':'reCAPTCHA verify नहीं हुआ। CAPTCHA पूरा करके दोबारा प्रयास करें।',
+    'auth/invalid-app-credential':'reCAPTCHA/app verification असफल हुई। Authorized domain और reCAPTCHA settings जाँचें।',
+    'auth/app-not-authorized':'यह website Firebase Authentication के authorized domains में नहीं है। Firebase Console में domain जोड़ें।',
+    'auth/operation-not-allowed':'Firebase Console में Phone provider enable नहीं है।',
+    'auth/network-request-failed':'Internet/network request fail हुई। Connection जाँचकर दोबारा प्रयास करें।',
+    'auth/unauthorized-domain':'यह domain Firebase Authentication में authorized नहीं है।',
+    'auth/internal-error':'Firebase ने internal error दिया। कुछ समय बाद दोबारा कोशिश करें।'
+  };
+  return messages[code]||('OTP नहीं भेज पाए'+(code?' ('+code+')':'')+'. '+((err&&err.message)||'Firebase Phone Authentication settings और browser console जाँचें।'));
 }
 function showAuth(mode){
   authMode=mode;
@@ -283,7 +313,12 @@ async function sendPhoneOtp(){
     $('authOtpWrap').classList.remove('hidden');$('verifyOtpBtn').classList.remove('hidden');
     $('sendOtpBtn').classList.add('hidden');$('authMobile').readOnly=true;
     $('authMessage').textContent='OTP भेज दी गई है। SMS में आया 6-digit code डालें।';
-  }catch(err){resetRecaptcha();toast('OTP नहीं भेज पाए: '+(err.message||'Firebase phone auth सेटिंग जाँचें।'));$('sendOtpBtn').disabled=false;}
+  }catch(err){
+    resetRecaptcha();
+    $('sendOtpBtn').disabled=false;
+    $('authMessage').textContent=phoneOtpErrorMessage(err);
+    toast(phoneOtpErrorMessage(err));
+  }
 }
 async function verifyPhoneOtp(){
   const code=$('authOtp').value.trim();
