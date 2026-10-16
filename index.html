@@ -220,7 +220,7 @@ firebase.initializeApp(firebaseConfig);
 const firebaseAuth = firebase.auth();
 let originalImage=null, rotated=0, finalCanvas=null, qrInstance=null;
 const $=id=>document.getElementById(id);
-window.mnpDemoLoggedIn=false;setInterval(()=>{if(!window.mnpDemoLoggedIn && $('authModal') && $('authModal').classList.contains('hidden'))showAuth('login')},5000);
+window.mnpDemoLoggedIn=false; // Do not force the login modal over the workspace; login opens only when the user selects Login/Register.
 function toast(msg){const t=$('toast');t.textContent=msg;t.classList.remove('hidden');clearTimeout(window._toastTimer);window._toastTimer=setTimeout(()=>t.classList.add('hidden'),3500)}
 function openTool(id){if(id==='developer-panel'&&!window.mnpIsDeveloper){toast('Developer access के लिए verified Developer login जरूरी है।');showAuth('developer');return}const target=$(id);if(!target){toast('यह tool workspace अभी उपलब्ध नहीं है।');return}document.querySelectorAll('.tool-workspace').forEach(el=>el.classList.toggle('active-workspace',el.id===id));target.scrollIntoView({behavior:'smooth',block:'start'});}
 
