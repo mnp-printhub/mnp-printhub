@@ -243,10 +243,12 @@ async function ensureRecaptcha(){
   const box=$('recaptcha-container');
   if(!box)throw new Error('reCAPTCHA container नहीं मिला।');
   try{
+    // Use Firebase's invisible reCAPTCHA to reduce the repeated checkbox friction.
+    // Firebase may still show a challenge when its risk checks require one.
     mnpRecaptchaVerifier=new firebase.auth.RecaptchaVerifier('recaptcha-container',{
-      size:'normal',
+      size:'invisible',
       callback:()=>{},
-      'expired-callback':()=>{resetRecaptcha();toast('reCAPTCHA expire हो गया। नया CAPTCHA पूरा करके OTP दोबारा भेजें।')}
+      'expired-callback':()=>{resetRecaptcha();toast('Verification expire हो गया। Send OTP दोबारा दबाएँ।')}
     });
     await mnpRecaptchaVerifier.render();
     return mnpRecaptchaVerifier;
