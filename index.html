@@ -270,6 +270,10 @@ async function sendPhoneOtp(){
   const mobile=$('authMobile').value.replace(/\D/g,'');
   if(!/^[6-9]\d{9}$/.test(mobile))return toast('Valid 10-digit Indian mobile number भरें।');
   if(authMode==='developer'&&mobile!=='8059509480')return toast('यह developer mobile number नहीं है।');
+  if(authMode==='forgot'){
+    let customerUsers={};try{customerUsers=JSON.parse(localStorage.getItem('mnp_demo_users')||'{}')}catch(_){}
+    if(!customerUsers[mobile])return toast('इस browser में इस mobile का customer account नहीं मिला।');
+  }
   if(authMode!=='developer'&&authMode!=='forgot')return toast('OTP इस विकल्प में उपलब्ध नहीं है।');
   try{
     $('sendOtpBtn').disabled=true;
@@ -302,7 +306,7 @@ async function verifyPhoneOtp(){
 async function resetCustomerPassword(){
   const mobile=mnpVerifiedPhone;
   const password=$('newPassword').value;
-  if(!mobile||!/^\d{6,}$/.test(password))return toast('कम-से-कम 6 characters का नया password डालें।');
+  if(!mobile||password.length<6)return toast('नया password कम-से-कम 6 characters का होना चाहिए।');
   let users={};try{users=JSON.parse(localStorage.getItem('mnp_demo_users')||'{}')}catch(_){}
   if(!users[mobile])return toast('इस browser में इस mobile का customer account नहीं मिला।');
   const data=new TextEncoder().encode(password);
