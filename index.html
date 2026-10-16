@@ -198,7 +198,7 @@
   <button id="registerTab" class="btn btn-primary flex-1" onclick="showAuth('register')">Register</button>
   <button id="developerTab" class="btn btn-soft flex-1" onclick="showAuth('developer')">🔐 Developer</button>
 </div>
-<form id="authForm" class="space-y-3" onsubmit="submitAuth(event)"><div id="authNameWrap"><label class="label">Full name</label><input id="authName" class="input" autocomplete="name" placeholder="Your name"></div><div><label class="label">Mobile number</label><input id="authMobile" class="input" inputmode="numeric" maxlength="10" autocomplete="tel" placeholder="10-digit mobile number" required></div><div><label class="label">Password</label><input id="authPassword" class="input" type="password" minlength="6" autocomplete="current-password" placeholder="At least 6 characters" required></div><p id="authMessage" class="text-xs text-slate-600">Register, then request ₹99 monthly access.</p><button id="authSubmit" class="btn btn-primary w-full" type="submit">Create account & continue</button></form><p class="text-xs text-amber-700 bg-amber-50 rounded-xl p-3 mt-4">Demo mode: account data is local to this browser only. This is not secure production authentication or server-side access control. A real deployment needs backend login; do not reuse an important password.</p></div></div>
+<form id="authForm" class="space-y-3" onsubmit="submitAuth(event)"><div id="authNameWrap"><label class="label">Full name</label><input id="authName" class="input" autocomplete="name" placeholder="Your name"></div><div><label class="label">Mobile number</label><input id="authMobile" class="input" inputmode="numeric" maxlength="10" autocomplete="tel" placeholder="10-digit mobile number" required></div><div id="authPasswordWrap"><label class="label">Password</label><input id="authPassword" class="input" type="password" minlength="6" autocomplete="current-password" placeholder="At least 6 characters"></div><div id="authOtpWrap" class="hidden"><label class="label">OTP</label><input id="authOtp" class="input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="Enter 6-digit OTP"></div><div id="recaptcha-container"></div><p id="authMessage" class="text-xs text-slate-600">Register, then request ₹99 monthly access.</p><button id="authSubmit" class="btn btn-primary w-full" type="submit">Create account & continue</button><button id="forgotPasswordBtn" class="text-sm font-semibold text-blue-600 w-full text-center" type="button" onclick="showAuth('forgot')">Forgot password?</button><button id="sendOtpBtn" class="btn btn-soft w-full hidden" type="button" onclick="sendPhoneOtp()">Send OTP</button><button id="verifyOtpBtn" class="btn btn-primary w-full hidden" type="button" onclick="verifyPhoneOtp()">Verify OTP</button><div id="resetPasswordWrap" class="hidden space-y-3"><label class="label">New password</label><input id="newPassword" class="input" type="password" minlength="6" autocomplete="new-password" placeholder="At least 6 characters"><button class="btn btn-primary w-full" type="button" onclick="resetCustomerPassword()">Set new password</button></div></form><p class="text-xs text-amber-700 bg-amber-50 rounded-xl p-3 mt-4">Demo mode: account data is local to this browser only. This is not secure production authentication or server-side access control. A real deployment needs backend login; do not reuse an important password.</p></div></div>
 <div id="toast" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 hidden bg-slate-800 text-white text-sm px-4 py-3 rounded-xl shadow-xl max-w-[90vw]"></div>
 <script src="https://docs.opencv.org/4.x/opencv.js" async></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
@@ -228,32 +228,110 @@ function applyPrintPreset(type){const info={A4:'A4: 210 × 297 mm · 300 DPI प
 window.addEventListener('load',()=>{if(!window.mnpDemoLoggedIn)showAuth('login')});
 function setBgColor(hex){$('bgColor').value=hex;renderBgPreview()}
 let authMode='register';
-
+let mnpConfirmationResult=null;
+let mnpRecaptchaVerifier=null;
+let mnpOtpPurpose=null;
+let mnpVerifiedPhone=null;
+function resetRecaptcha(){
+  try{if(mnpRecaptchaVerifier){mnpRecaptchaVerifier.clear();}}catch(_){}
+  mnpRecaptchaVerifier=null;
+  const box=$('recaptcha-container');if(box)box.innerHTML='';
+}
+function ensureRecaptcha(){
+  if(mnpRecaptchaVerifier)return Promise.resolve(mnpRecaptchaVerifier);
+  if(!window.firebase||!firebase.auth)return Promise.reject(new Error('Firebase Auth load नहीं हुआ।'));
+  mnpRecaptchaVerifier=new firebase.auth.RecaptchaVerifier('recaptcha-container',{size:'normal',callback:()=>{},'expired-callback':()=>{mnpRecaptchaVerifier=null;toast('reCAPTCHA expire हो गया। दोबारा Send OTP करें।')}});
+  return mnpRecaptchaVerifier.render().then(()=>mnpRecaptchaVerifier);
+}
 function showAuth(mode){
   authMode=mode;
-  $('authModal').classList.remove('hidden');
-  $('authModal').classList.add('flex');
-  $('authTitle').textContent =
-    mode==='register' ? 'Create account' :
-    mode==='developer' ? 'Developer Login' : 'Welcome back';
-  $('authNameWrap').classList.toggle('hidden',mode==='login'||mode==='developer');
-  $('authPassword').autocomplete =
-    mode==='login' ? 'current-password' : 'new-password';
-  $('authSubmit').textContent =
-    mode==='register' ? 'Create account & continue' :
-    mode==='developer' ? 'Developer Login' : 'Login';
-  $('registerTab').className='btn '+(mode==='register'?'btn-primary':'btn-soft')+' flex-1';
+  $('authModal').classList.remove('hidden');$('authModal').classList.add('flex');
+  $('authTitle').textContent=mode==='register'?'Create account':mode==='developer'?'Developer Login':mode==='forgot'?'Reset password':'Welcome back';
+  $('authNameWrap').classList.toggle('hidden',mode!=='register');
+  $('authPasswordWrap').classList.toggle('hidden',mode==='developer'||mode==='forgot');
+  $('authOtpWrap').classList.add('hidden');$('resetPasswordWrap').classList.add('hidden');
+  $('authPassword').required=mode==='login'||mode==='register';
+  $('authMobile').readOnly=false;
+  $('authSubmit').classList.toggle('hidden',mode==='developer'||mode==='forgot');
+  $('sendOtpBtn').classList.toggle('hidden',mode!=='developer'&&mode!=='forgot');
+  $('verifyOtpBtn').classList.add('hidden');
+  $('forgotPasswordBtn').classList.toggle('hidden',mode!=='login');
+  $('authSubmit').textContent=mode==='register'?'Create account & continue':'Login';
   $('loginTab').className='btn '+(mode==='login'?'btn-primary':'btn-soft')+' flex-1';
-  if($('developerTab')){
-    $('developerTab').className='btn '+(mode==='developer'?'btn-primary':'btn-soft')+' flex-1';
-  }
-  $('authMessage').textContent =
-    mode==='register' ? 'Register, then request ₹99 monthly access.' :
-    mode==='developer' ? 'Developer access requires separate secure verification.' :
-    'Login on this browser using the demo account you registered here.';
+  $('registerTab').className='btn '+(mode==='register'?'btn-primary':'btn-soft')+' flex-1';
+  $('developerTab').className='btn '+(mode==='developer'?'btn-primary':'btn-soft')+' flex-1';
+  $('authMessage').textContent=mode==='register'?'Register, then request ₹99 monthly access.':mode==='developer'?'अपना registered developer mobile number डालकर OTP मँगाएँ।':mode==='forgot'?'अपने registered customer mobile पर OTP मँगाएँ।':'Login on this browser using the demo account you registered here.';
+  $('sendOtpBtn').textContent=mode==='forgot'?'Send reset OTP':'Send OTP';
+  $('authOtp').value='';$('authPassword').value='';
+  resetRecaptcha();
 }
 function hideAuth(){if(!window.mnpDemoLoggedIn){toast('Website use करने के लिए login/register करें।');return}$('authModal').classList.add('hidden');$('authModal').classList.remove('flex')}
-async function submitAuth(e){e.preventDefault();const mobile=$('authMobile').value.replace(/\D/g,'');const password=$('authPassword').value;const name=$('authName').value.trim();if(!/^[6-9]\d{9}$/.test(mobile))return toast('Valid 10-digit Indian mobile number भरें।');let users={};try{users=JSON.parse(localStorage.getItem('mnp_demo_users')||'{}')}catch(_){}const digest=async str=>{const data=new TextEncoder().encode(str);const hash=await crypto.subtle.digest('SHA-256',data);return [...new Uint8Array(hash)].map(b=>b.toString(16).padStart(2,'0')).join('')};if(authMode==='developer'){if(mobile==='8059509480'&&password==='123456'){window.mnpIsDeveloper=true;window.mnpDemoLoggedIn=true;$('authModal').classList.add('hidden');$('authModal').classList.remove('flex');toast('Developer demo login सफल।');openTool('developer-panel');return;}return toast('Developer mobile number या password गलत है।')}if(authMode==='register'){if(!name)return toast('अपना नाम भरें।');if(users[mobile])return toast('इस मोबाइल से demo account पहले से है। Login करें।');users[mobile]={name,passwordHash:await digest(password),status:'pending'};localStorage.setItem('mnp_demo_users',JSON.stringify(users));window.mnpDemoLoggedIn=true;$('subName').value=name;$('subMobile').value=mobile;hideAuth();openTool('subscription-tool');toast('Demo registration हो गई। ₹99 payment request भेजें।')}else{if(!users[mobile]||users[mobile].passwordHash!==await digest(password))return toast('इस browser में account नहीं मिला या password गलत है।');window.mnpDemoLoggedIn=true;hideAuth();toast('Demo login सफल: '+users[mobile].name);openTool('subscription-tool')}}
+async function sendPhoneOtp(){
+  const mobile=$('authMobile').value.replace(/\D/g,'');
+  if(!/^[6-9]\d{9}$/.test(mobile))return toast('Valid 10-digit Indian mobile number भरें।');
+  if(authMode==='developer'&&mobile!=='8059509480')return toast('यह developer mobile number नहीं है।');
+  if(authMode!=='developer'&&authMode!=='forgot')return toast('OTP इस विकल्प में उपलब्ध नहीं है।');
+  try{
+    $('sendOtpBtn').disabled=true;
+    const verifier=await ensureRecaptcha();
+    mnpConfirmationResult=await firebase.auth().signInWithPhoneNumber('+91'+mobile,verifier);
+    mnpOtpPurpose=authMode;mnpVerifiedPhone=mobile;
+    $('authOtpWrap').classList.remove('hidden');$('verifyOtpBtn').classList.remove('hidden');
+    $('sendOtpBtn').classList.add('hidden');$('authMobile').readOnly=true;
+    $('authMessage').textContent='OTP भेज दी गई है। SMS में आया 6-digit code डालें।';
+  }catch(err){resetRecaptcha();toast('OTP नहीं भेज पाए: '+(err.message||'Firebase phone auth सेटिंग जाँचें।'));$('sendOtpBtn').disabled=false;}
+}
+async function verifyPhoneOtp(){
+  const code=$('authOtp').value.trim();
+  if(!/^\d{6}$/.test(code))return toast('6-digit OTP डालें।');
+  try{
+    await mnpConfirmationResult.confirm(code);
+    if(mnpOtpPurpose==='developer'){
+      window.mnpIsDeveloper=true;window.mnpDemoLoggedIn=true;
+      $('authModal').classList.add('hidden');$('authModal').classList.remove('flex');
+      toast('Developer OTP verified.');openTool('developer-panel');return;
+    }
+    if(mnpOtpPurpose==='forgot'){
+      $('authOtpWrap').classList.add('hidden');$('verifyOtpBtn').classList.add('hidden');
+      $('resetPasswordWrap').classList.remove('hidden');
+      $('authMessage').textContent='OTP verified. अब नया password set करें।';
+      return;
+    }
+  }catch(err){toast('OTP गलत या expire हो गई है। दोबारा कोशिश करें।');}
+}
+async function resetCustomerPassword(){
+  const mobile=mnpVerifiedPhone;
+  const password=$('newPassword').value;
+  if(!mobile||!/^\d{6,}$/.test(password))return toast('कम-से-कम 6 characters का नया password डालें।');
+  let users={};try{users=JSON.parse(localStorage.getItem('mnp_demo_users')||'{}')}catch(_){}
+  if(!users[mobile])return toast('इस browser में इस mobile का customer account नहीं मिला।');
+  const data=new TextEncoder().encode(password);
+  const hash=await crypto.subtle.digest('SHA-256',data);
+  users[mobile].passwordHash=[...new Uint8Array(hash)].map(b=>b.toString(16).padStart(2,'0')).join('');
+  localStorage.setItem('mnp_demo_users',JSON.stringify(users));
+  toast('Password reset हो गया। अब Login करें।');showAuth('login');$('authMobile').value=mobile;
+}
+async function submitAuth(e){
+  e.preventDefault();
+  const mobile=$('authMobile').value.replace(/\D/g,'');
+  const password=$('authPassword').value;
+  const name=$('authName').value.trim();
+  if(!/^[6-9]\d{9}$/.test(mobile))return toast('Valid 10-digit Indian mobile number भरें।');
+  if(authMode==='developer'||authMode==='forgot')return sendPhoneOtp();
+  let users={};try{users=JSON.parse(localStorage.getItem('mnp_demo_users')||'{}')}catch(_){}
+  const digest=async str=>{const data=new TextEncoder().encode(str);const hash=await crypto.subtle.digest('SHA-256',data);return [...new Uint8Array(hash)].map(b=>b.toString(16).padStart(2,'0')).join('')};
+  if(authMode==='register'){
+    if(!name)return toast('अपना नाम भरें।');
+    if(password.length<6)return toast('Password कम-से-कम 6 characters का होना चाहिए।');
+    if(users[mobile])return toast('इस मोबाइल से demo account पहले से है। Login करें।');
+    users[mobile]={name,passwordHash:await digest(password),status:'pending'};
+    localStorage.setItem('mnp_demo_users',JSON.stringify(users));window.mnpDemoLoggedIn=true;
+    $('subName').value=name;$('subMobile').value=mobile;hideAuth();openTool('subscription-tool');toast('Demo registration हो गई। ₹99 payment request भेजें。');
+  }else{
+    if(!users[mobile]||users[mobile].passwordHash!==await digest(password))return toast('इस browser में account नहीं मिला या password गलत है।');
+    window.mnpDemoLoggedIn=true;hideAuth();toast('Demo login सफल: '+users[mobile].name);openTool('subscription-tool');
+  }
+}
 function filterTools(){const q=$('toolSearch').value.trim().toLowerCase();let count=0;document.querySelectorAll('.tool-card').forEach(c=>{const show=(c.dataset.search+' '+c.innerText).toLowerCase().includes(q);c.style.display=show?'':'none';if(show)count++});$('toolCount').textContent=count+' tools'}
 const customerStorageKey='mnp_customer_records_v1';
 function getCustomerRecords(){try{return JSON.parse(localStorage.getItem(customerStorageKey)||'[]')}catch(_){return []}}
