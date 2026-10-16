@@ -198,7 +198,7 @@
   <button id="registerTab" class="btn btn-primary flex-1" onclick="showAuth('register')">Register</button>
   <button id="developerTab" class="btn btn-soft flex-1" onclick="showAuth('developer')">🔐 Developer</button>
 </div>
-<form id="authForm" class="space-y-3" onsubmit="submitAuth(event)"><div id="authNameWrap"><label class="label">Full name</label><input id="authName" class="input" autocomplete="name" placeholder="Your name"></div><div><label class="label">Mobile number</label><input id="authMobile" class="input" inputmode="numeric" maxlength="10" autocomplete="tel" placeholder="10-digit mobile number" required></div><div id="authPasswordWrap"><label class="label">Password</label><input id="authPassword" class="input" type="password" minlength="6" autocomplete="current-password" placeholder="At least 6 characters"></div><div id="authOtpWrap" class="hidden"><label class="label">OTP</label><input id="authOtp" class="input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="Enter 6-digit OTP"></div><div id="recaptcha-container"></div><p id="authMessage" class="text-xs text-slate-600">Register, then request ₹99 monthly access.</p><button id="authSubmit" class="btn btn-primary w-full" type="submit">Create account & continue</button><button id="forgotPasswordBtn" class="text-sm font-semibold text-blue-600 w-full text-center" type="button" onclick="showAuth('forgot')">Forgot password?</button><button id="sendOtpBtn" class="btn btn-soft w-full hidden" type="button" onclick="sendPhoneOtp()">Send OTP</button><button id="verifyOtpBtn" class="btn btn-primary w-full hidden" type="button" onclick="verifyPhoneOtp()">Verify OTP</button><div id="resetPasswordWrap" class="hidden space-y-3"><label class="label">New password</label><input id="newPassword" class="input" type="password" minlength="6" autocomplete="new-password" placeholder="At least 6 characters"><button class="btn btn-primary w-full" type="button" onclick="resetCustomerPassword()">Set new password</button></div></form><p class="text-xs text-amber-700 bg-amber-50 rounded-xl p-3 mt-4">Demo mode: account data is local to this browser only. This is not secure production authentication or server-side access control. A real deployment needs backend login; do not reuse an important password.</p></div></div>
+<form id="authForm" class="space-y-3" onsubmit="submitAuth(event)"><div id="authNameWrap"><label class="label">Full name</label><input id="authName" class="input" autocomplete="name" placeholder="Your name"></div><div><label class="label">Mobile number</label><input id="authMobile" class="input" inputmode="numeric" maxlength="10" autocomplete="tel" placeholder="10-digit mobile number" required></div><div id="localCaptchaWrap" class="hidden space-y-2"><label class="label">Captcha code</label><div class="flex items-center gap-2"><div id="localCaptchaQuestion" class="rounded-xl border bg-slate-100 px-4 py-3 font-bold tracking-widest text-slate-800" aria-live="polite">-- + -- = ?</div><button type="button" class="btn btn-soft" onclick="refreshLocalCaptcha()" aria-label="Generate new captcha">↻ New code</button></div><input id="localCaptchaAnswer" class="input" inputmode="numeric" autocomplete="off" maxlength="2" placeholder="Answer the math question"><p class="text-xs text-slate-500">Quick check before requesting OTP. Firebase verification still runs separately.</p></div><div id="authPasswordWrap"><label class="label">Password</label><input id="authPassword" class="input" type="password" minlength="6" autocomplete="current-password" placeholder="At least 6 characters"></div><div id="authOtpWrap" class="hidden"><label class="label">OTP</label><input id="authOtp" class="input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="Enter 6-digit OTP"></div><div id="recaptcha-container"></div><p id="authMessage" class="text-xs text-slate-600">Register, then request ₹99 monthly access.</p><button id="authSubmit" class="btn btn-primary w-full" type="submit">Create account & continue</button><button id="forgotPasswordBtn" class="text-sm font-semibold text-blue-600 w-full text-center" type="button" onclick="showAuth('forgot')">Forgot password?</button><button id="sendOtpBtn" class="btn btn-soft w-full hidden" type="button" onclick="sendPhoneOtp()">Send OTP</button><button id="verifyOtpBtn" class="btn btn-primary w-full hidden" type="button" onclick="verifyPhoneOtp()">Verify OTP</button><div id="resetPasswordWrap" class="hidden space-y-3"><label class="label">New password</label><input id="newPassword" class="input" type="password" minlength="6" autocomplete="new-password" placeholder="At least 6 characters"><button class="btn btn-primary w-full" type="button" onclick="resetCustomerPassword()">Set new password</button></div></form><p class="text-xs text-amber-700 bg-amber-50 rounded-xl p-3 mt-4">Demo mode: account data is local to this browser only. This is not secure production authentication or server-side access control. A real deployment needs backend login; do not reuse an important password.</p></div></div>
 <div id="toast" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 hidden bg-slate-800 text-white text-sm px-4 py-3 rounded-xl shadow-xl max-w-[90vw]"></div>
 <script src="https://docs.opencv.org/4.x/opencv.js" async></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
@@ -232,6 +232,14 @@ let mnpConfirmationResult=null;
 let mnpRecaptchaVerifier=null;
 let mnpOtpPurpose=null;
 let mnpVerifiedPhone=null;
+let mnpCaptchaExpected=null;
+function refreshLocalCaptcha(){
+  const a=Math.floor(Math.random()*5)+1,b=Math.floor(Math.random()*5)+1;
+  mnpCaptchaExpected=String(a+b);
+  const q=$('localCaptchaQuestion'),ans=$('localCaptchaAnswer');
+  if(q)q.textContent=a+' + '+b+' = ?';
+  if(ans)ans.value='';
+}
 function resetRecaptcha(){
   try{if(mnpRecaptchaVerifier){mnpRecaptchaVerifier.clear();}}catch(_){}
   mnpRecaptchaVerifier=null;
@@ -295,6 +303,8 @@ function showAuth(mode){
   $('authMessage').textContent=mode==='register'?'Register, then request ₹99 monthly access.':mode==='developer'?'अपना registered developer mobile number डालकर OTP मँगाएँ।':mode==='forgot'?'अपने registered customer mobile पर OTP मँगाएँ।':'Login on this browser using the demo account you registered here.';
   $('sendOtpBtn').textContent=mode==='forgot'?'Send reset OTP':'Send OTP';
   $('authOtp').value='';$('authPassword').value='';
+  $('localCaptchaWrap').classList.toggle('hidden',mode!=='developer'&&mode!=='forgot');
+  refreshLocalCaptcha();
   resetRecaptcha();
 }
 function hideAuth(){if(!window.mnpDemoLoggedIn){toast('Website use करने के लिए login/register करें।');return}$('authModal').classList.add('hidden');$('authModal').classList.remove('flex')}
@@ -302,6 +312,11 @@ async function sendPhoneOtp(){
   const mobile=$('authMobile').value.replace(/\D/g,'');
   if(!/^[6-9]\d{9}$/.test(mobile))return toast('Valid 10-digit Indian mobile number भरें।');
   if(authMode==='developer'&&mobile!=='8059509480')return toast('यह developer mobile number नहीं है।');
+  if(authMode==='developer'||authMode==='forgot'){
+    const answer=$('localCaptchaAnswer').value.trim();
+    if(!mnpCaptchaExpected||answer!==mnpCaptchaExpected){refreshLocalCaptcha();return toast('Captcha गलत है। नया आसान सवाल हल करके फिर प्रयास करें।');}
+    refreshLocalCaptcha();
+  }
   if(authMode==='forgot'){
     let customerUsers={};try{customerUsers=JSON.parse(localStorage.getItem('mnp_demo_users')||'{}')}catch(_){}
     if(!customerUsers[mobile])return toast('इस browser में इस mobile का customer account नहीं मिला।');
